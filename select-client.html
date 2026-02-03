@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Sélectionner une société EXTIA</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { color-scheme: only light; }
+    body {
+      background:#fff; color:#000; font-family: Arial, Helvetica, sans-serif;
+      margin: 30px; line-height: 1.45;
+    }
+    .wrap { max-width: 720px; margin: 0 auto; }
+    h2 { margin: 0 0 14px; }
+
+    /* Barre de recherche + croix */
+    .search-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 8px;
+      align-items: center;
+      margin: 8px 0 12px;
+    }
+    #search {
+      width: 100%;
+      padding: 10px;
+      font-size: 14px;
+      border: 1px solid #bdbdbd;
+      border-radius: 4px;
+    }
+    /* Petite croix simple */
+    #clearSearch {
+      display: none;             /* visible seulement si du texte est saisi */
+      border: 1px solid #bdbdbd;
+      color: #444;
+      background: #f5f5f5;
+      border-radius: 4px;
+      font: 16px/1 Arial, sans-serif;
+      padding: 8px 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+    #clearSearch:hover { background: #eee; }
+
+    /* Liste + bouton */
+    #liste {
+      width: 100%; height: 320px;
+      border: 1px solid #bdbdbd; border-radius: 4px; padding: 6px;
+    }
+    option { padding: 6px 8px; }
+    option:checked, option:hover { background: #e6f0ff; color: #000; }
+
+    .btn {
+      display: none; margin-top: 16px;
+      text-decoration: none; color: #fff; font-weight: 600;
+      background: #2E7D32; padding: 12px 18px; border-radius: 6px;
+    }
+    .meta { font-size: 12px; color: #555; margin-top: 8px; }
+    .err  { color: crimson; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>🔎 Sélectionner une société EXTIA</h2>
+
+    <div class="search-row">
+      <input id="search" type="text" placeholder="Rechercher une société…" autocomplete="off" />
+      <button id="clearSearch" type="button" aria-label="Effacer">×</button>
+    </div>
+
+    <select id="liste" size="14"></select>
+
+    <a id="btnOui" class="btn" href="#" title="Sélectionnez d’abord une société">
+      📧 Envoyer l’email OUI avec ce client
+    </a>
+
+    <div class="meta" id="status">Chargement…</div>
+  </div>
+
+  <!-- 1) SheetJS -->
+  <script src="xlsx.full.min.js"></script>
+  <!-- 2) Votre Excel encodé en Base64 -->
+  <script src="Societe_base64.js"></script>
+
+  <script>
+    (function () {
+      // --- Paramètres passés dans l’URL par l’e-mail UiPath
+      const p = new URLSearchParams(window.location.search);
+      const NUM     = p.get('NUM')     || '';
+      const SUBJECT = p.get('SUBJECT') || '';
+      const DATERED = p.get('DATERED') || '';
+
+      // --- Références DOM
+      const elSearch = document.getElementById('search');
+      const elClear  = document.getElementById('clearSearch');
+      const elList   = document.getElementById('liste');
+      const elBtn    = document.getElementById('btnOui');
+      const elStatus = document.getElementById('status');
+
+      // --- Garde-fous
+      if (!window.XLSX) {
+        elStatus.textContent = "Erreur : xlsx.full.min.js introuvable. Placez-le dans le même dossier.";
+        elStatus.className = "meta err";
+        return;
+      }
+      if (!window.SOCIETE_XLSX_BASE64 || typeof window.SOCIETE_XLSX_BASE64 !== 'string') {
+        elStatus.textContent = "Erreur : Societe_base64.js n'est pas chargé (ou vide).";
+        elStatus.className = "meta err";
+        return;
+      }
+
+      // --- Lecture Excel (feuille 1, colonne A, header en ligne 1)
+      let workbook;
+      try {
+        workbook = XLSX.read(window.SOCIETE_XLSX_BASE64, { type: 'base64' });
+      } catch (e) {
+        console.error(e);
+        elStatus.textContent = "Erreur : impossible de décoder l'Excel.";
+        elStatus.className = "meta err";
+        return;
+      }
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows  = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+      const clients = [];
+      for (let i = 1; i < rows.length; i++) { // saute l'en-tête
+        const v = (rows[i] && rows[i][0] != null) ? String(rows[i][0]).trim() : '';
+        if (v) clients.push(v);
+      }
+
+      // --- Rendu liste
+      function render(list) {
+        elList.innerHTML = '';
+        list.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c;
+          opt.textContent = c;
+          elList.appendChild(opt);
+        });
+        elStatus.textContent = `${list.length} société(s) affichée(s) — Colonne A`;
+        elStatus.className = "meta";
+        // Reset bouton
+        elBtn.style.display = 'none';
+        elBtn.href = '#';
+        elBtn.title = 'Sélectionnez d’abord une société';
+      }
+
+      render(clients);
+
+      // --- Filtre + affichage / masquage de la croix
+      elSearch.addEventListener('input', () => {
+        const q = elSearch.value.toLowerCase();
+        elClear.style.display = q ? 'inline-block' : 'none';
+
+        const filt = q ? clients.filter(c => c.toLowerCase().includes(q)) : clients;
+        render(filt);
+        if (elList.options.length > 0) elList.selectedIndex = 0;
+      });
+
+      // --- Crois (×) = effacer + reset + focus
+      elClear.addEventListener('click', () => {
+        elSearch.value = "";
+        elClear.style.display = "none";
+        render(clients);
+        elSearch.focus();
+      });
+
+      // --- Mailto (OUI)
+      function buildMailto(client) {
+        const to = 'support-rpa@extia.fr';
+        const subject = `[RPA005][${NUM}]Validation - OUI | ${SUBJECT}`;
+        const body =
+          `OUI, Je souhaite supprimer le volet ${DATERED} et clôturer cette rouge.\n` +
+          `Client sélectionné : ${client}`;
+        return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      }
+
+      // Sélection dans la liste -> active le bouton
+      elList.addEventListener('change', () => {
+        const val = elList.value;
+        if (val) {
+          elBtn.href = buildMailto(val);
+          elBtn.style.display = 'inline-block';
+          elBtn.title = '';
+        } else {
+          elBtn.style.display = 'none';
+          elBtn.href = '#';
+          elBtn.title = 'Sélectionnez d’abord une société';
+        }
+      });
+
+      // Double-clic / Entrée -> ouvre directement le mail OUI
+      elList.addEventListener('dblclick', () => {
+        const val = elList.value;
+        if (val) window.location.href = buildMailto(val);
+      });
+      elList.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          const val = elList.value;
+          if (val) window.location.href = buildMailto(val);
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
