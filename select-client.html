@@ -13,7 +13,6 @@
     .wrap { max-width: 720px; margin: 0 auto; }
     h2 { margin: 0 0 14px; }
 
-    /* Barre de recherche + croix */
     .search-row {
       display: grid;
       grid-template-columns: 1fr auto;
@@ -28,9 +27,8 @@
       border: 1px solid #bdbdbd;
       border-radius: 4px;
     }
-    /* Petite croix simple */
     #clearSearch {
-      display: none;             /* visible seulement si du texte est saisi */
+      display: none;
       border: 1px solid #bdbdbd;
       color: #444;
       background: #f5f5f5;
@@ -42,7 +40,6 @@
     }
     #clearSearch:hover { background: #eee; }
 
-    /* Liste + bouton */
     #liste {
       width: 100%; height: 320px;
       border: 1px solid #bdbdbd; border-radius: 4px; padding: 6px;
@@ -71,64 +68,60 @@
     <select id="liste" size="14"></select>
 
     <a id="btnOui" class="btn" href="#" title="Sélectionnez d’abord une société">
-      📧 Envoyer l’email avec ce client
+      📧 Envoyer l’email avec Gmail Web
     </a>
 
     <div class="meta" id="status">Chargement…</div>
   </div>
 
-  <!-- 1) SheetJS -->
+  <!-- Librairie Excel -->
   <script src="xlsx.full.min.js"></script>
-  <!-- 2) Votre Excel encodé en Base64 -->
+  <!-- Ton Excel encodé en base64 -->
   <script src="Societe_base64.js"></script>
 
   <script>
     (function () {
-      // --- Paramètres passés dans l’URL par l’e-mail UiPath
+
       const p = new URLSearchParams(window.location.search);
       const NUM     = p.get('NUM')     || '';
       const SUBJECT = p.get('SUBJECT') || '';
       const DATERED = p.get('DATERED') || '';
 
-      // --- Références DOM
       const elSearch = document.getElementById('search');
       const elClear  = document.getElementById('clearSearch');
       const elList   = document.getElementById('liste');
       const elBtn    = document.getElementById('btnOui');
       const elStatus = document.getElementById('status');
 
-      // --- Garde-fous
       if (!window.XLSX) {
-        elStatus.textContent = "Erreur : xlsx.full.min.js introuvable. Placez-le dans le même dossier.";
+        elStatus.textContent = "Erreur : xlsx.full.min.js introuvable.";
         elStatus.className = "meta err";
         return;
       }
-      if (!window.SOCIETE_XLSX_BASE64 || typeof window.SOCIETE_XLSX_BASE64 !== 'string') {
-        elStatus.textContent = "Erreur : Societe_base64.js n'est pas chargé (ou vide).";
+      if (!window.SOCIETE_XLSX_BASE64) {
+        elStatus.textContent = "Erreur : Societe_base64.js manquant.";
         elStatus.className = "meta err";
         return;
       }
 
-      // --- Lecture Excel (feuille 1, colonne A, header en ligne 1)
       let workbook;
       try {
         workbook = XLSX.read(window.SOCIETE_XLSX_BASE64, { type: 'base64' });
       } catch (e) {
-        console.error(e);
-        elStatus.textContent = "Erreur : impossible de décoder l'Excel.";
+        elStatus.textContent = "Erreur : impossible de lire l'Excel.";
         elStatus.className = "meta err";
         return;
       }
+
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows  = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
       const clients = [];
-      for (let i = 1; i < rows.length; i++) { // saute l'en-tête
+      for (let i = 1; i < rows.length; i++) {
         const v = (rows[i] && rows[i][0] != null) ? String(rows[i][0]).trim() : '';
         if (v) clients.push(v);
       }
 
-      // --- Rendu liste
       function render(list) {
         elList.innerHTML = '';
         list.forEach(c => {
@@ -137,17 +130,12 @@
           opt.textContent = c;
           elList.appendChild(opt);
         });
-        elStatus.textContent = `${list.length} société(s) affichée(s) — Colonne A`;
-        elStatus.className = "meta";
-        // Reset bouton
+        elStatus.textContent = `${list.length} société(s) affichée(s)`;
         elBtn.style.display = 'none';
-        elBtn.href = '#';
-        elBtn.title = 'Sélectionnez d’abord une société';
       }
 
       render(clients);
 
-      // --- Filtre + affichage / masquage de la croix
       elSearch.addEventListener('input', () => {
         const q = elSearch.value.toLowerCase();
         elClear.style.display = q ? 'inline-block' : 'none';
@@ -157,7 +145,6 @@
         if (elList.options.length > 0) elList.selectedIndex = 0;
       });
 
-      // --- Crois (×) = effacer + reset + focus
       elClear.addEventListener('click', () => {
         elSearch.value = "";
         elClear.style.display = "none";
@@ -165,45 +152,43 @@
         elSearch.focus();
       });
 
-      // --- Mailto (OUI)
-      function buildMailto(client) {
+      /* -----------------------------
+         🔥 Nouvelle fonction GMAIL
+         ----------------------------- */
+      function buildGmail(client) {
         const to = 'support-rpa@extia.fr';
         const subject = `[RPA005][${NUM}]Validation - OUI | ${SUBJECT}`;
         const body =
-          `OUI, Je souhaite utiliser cette societe ${client} et clôturer cette rouge.\n` +
+          `OUI, Je souhaite utiliser cette société ${client} et clôturer cette rouge.\n` +
           `Client sélectionné : ${client}`;
-        return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
+        return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       }
 
-      // Sélection dans la liste -> active le bouton
       elList.addEventListener('change', () => {
         const val = elList.value;
         if (val) {
-          elBtn.href = buildMailto(val);
+          elBtn.href = buildGmail(val);
           elBtn.style.display = 'inline-block';
-          elBtn.title = '';
         } else {
           elBtn.style.display = 'none';
-          elBtn.href = '#';
-          elBtn.title = 'Sélectionnez d’abord une société';
+          elBtn.href = "#";
         }
       });
 
-      // Double-clic / Entrée -> ouvre directement le mail OUI
       elList.addEventListener('dblclick', () => {
         const val = elList.value;
-        if (val) window.location.href = buildMailto(val);
+        if (val) window.location.href = buildGmail(val);
       });
-      elList.addEventListener('keydown', (e) => {
+
+      elList.addEventListener('keydown', e => {
         if (e.key === 'Enter') {
           const val = elList.value;
-          if (val) window.location.href = buildMailto(val);
+          if (val) window.location.href = buildGmail(val);
         }
       });
+
     })();
   </script>
 </body>
 </html>
-
-
-
