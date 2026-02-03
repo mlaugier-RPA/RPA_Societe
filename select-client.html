@@ -161,6 +161,17 @@
         const body =
           `OUI, Je souhaite utiliser cette société ${client} et clôturer cette rouge.\n` +
           `Client sélectionné : ${client}`;
+          `Après avoir envoyer l'email, vous pouvez cloturer cette page`;
+
+
+          `Cordialement`;
+
+          `[-----------------0%----------------->]`;
+
+          `Cet e-mail a été généré de façon automatique, si vous rencontrez un problème, merci de contacter support-rpa@extia.fr.`;
+
+          `Votre assistant vituel`;
+
 
         return `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(to)}&su=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       }
