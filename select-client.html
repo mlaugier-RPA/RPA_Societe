@@ -170,8 +170,7 @@
         const to = 'support-rpa@extia.fr';
         const subject = `[RPA005][${NUM}]Validation - OUI | ${SUBJECT}`;
         const body =
-          `OUI, Je souhaite supprimer le volet ${DATERED} et clôturer cette rouge.\n` +
-          `Client sélectionné : ${client}`;
+          `OUI, Je souhaite utiliser le volet ${client}` et clôturer cette rouge.\n` ;
         return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
       }
 
